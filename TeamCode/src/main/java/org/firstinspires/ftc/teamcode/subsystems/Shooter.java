@@ -44,6 +44,25 @@ public class Shooter {
         hood.setPosition(Range.clip(position, HOOD_MIN, HOOD_MAX));
     }
 
+    public double velocityForDistance(double distance) {
+        return interpolate(SHOT_DISTANCES, SHOT_VELOCITIES, distance);
+    }
+
+    public double hoodForDistance(double distance) {
+        return interpolate(SHOT_DISTANCES, SHOT_HOODS, distance);
+    }
+
+    private static double interpolate(double[] xs, double[] ys, double x) {
+        if (x <= xs[0]) return ys[0];
+        for (int i = 1; i < xs.length; i++) {
+            if (x <= xs[i]) {
+                double t = (x - xs[i - 1]) / (xs[i] - xs[i - 1]);
+                return ys[i - 1] + t * (ys[i] - ys[i - 1]);
+            }
+        }
+        return ys[ys.length - 1];
+    }
+
     public double getHoodPosition() {
         return hood.getPosition();
     }

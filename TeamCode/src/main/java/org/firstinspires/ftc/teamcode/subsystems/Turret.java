@@ -18,8 +18,10 @@ public class Turret {
     }
 
     public void rotate(double input) {
-        double power = Math.abs(input) > STICK_DEADBAND
-                ? input * TURRET_MANUAL_POWER : 0;
+        setPower(Math.abs(input) > STICK_DEADBAND ? input * TURRET_MANUAL_POWER : 0);
+    }
+
+    public void setPower(double power) {
         if (TURRET_LIMITS_ENABLED) {
             int position = getPosition();
             if ((position <= TURRET_MIN_TICKS && power < 0)
@@ -30,7 +32,6 @@ public class Turret {
         motor.setPower(power);
     }
 
-    // This establishes a reference only; it does not move or home the turret.
     public void resetEncoder() {
         motor.setPower(0);
         motor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
@@ -39,6 +40,14 @@ public class Turret {
 
     public int getPosition() {
         return motor.getCurrentPosition();
+    }
+
+    public double getDegrees() {
+        return toDegrees(getPosition());
+    }
+
+    public static double toDegrees(double ticks) {
+        return ticks * TURRET_FULL_RANGE_DEGREE / TURRET_FULL_RANGE_ENCODER;
     }
 
     public void stop() {

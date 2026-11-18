@@ -1,7 +1,8 @@
 # FTC 19682 — BIOBUZZ
 
 Starter teleop for the 2026–2027 robot, using Pedro Pathing 3.0.2, Ivy 1.1.1,
-and FTC SDK 12.0.0. Select **Basic TeleOp** on the Driver Station.
+and FTC SDK 12.0.0. Select **RedTeleOp** or **BlueTeleOp** on the Driver Station; they differ only
+in target CELLs and relocalize pose.
 
 The code keeps separate drivetrain, intake, shooter, and motor-driven turret
 subsystems, owned by `Robot`. Ivy sequences the feeder pulse without blocking
@@ -9,8 +10,9 @@ driving or other controls. Shooter velocity uses the REV Hub's encoder control;
 there is no FTCLib dependency or copied shot calibration from last season.
 The flywheels idle at 200 encoder ticks/s after START. Set
 `SHOOTER_IDLE_VELOCITY = 0` in `RobotConstants` (or Panels) to disable idle spin.
-There is no auto-aim or active autonomous routine. The existing Auto Template
-remains disabled.
+Turret auto aim is implemented but disabled until commissioned (see
+[Auto aim](#auto-aim)). There is no active autonomous routine; the existing Auto
+Template remains disabled.
 
 ## Hardware configuration
 
@@ -39,14 +41,18 @@ currently zero placeholders. Set the actual pod type, directions, and offsets in
 | 1 | Left stick / right stick X | Translate / turn |
 | 1 | Hold left stick button | Slow drive |
 | 1 | Options | Toggle robot/field-centric driving; starts robot-centric |
-| 1 | Start | Set the current heading to zero; use while stationary |
+| 1 | Start | Relocalize to the alliance LOADING ZONE pose; also sets field-centric forward to the robot's current facing. Use while stationary |
+| 1 | X | Toggle auto aim (only when `AUTO_AIM_ENABLED`) |
+| 1 | Y | Toggle shooting while moving; starts off |
 | 1 | Right trigger | Proportional collection; returns shooter to idle |
 | 1 | Left trigger | Proportional ejection; returns shooter to idle; wins over collection |
 | 1 | Left bumper | Toggle shooting speed / idle; starts at idle |
 | 1 | Tap right bumper | One feeder pulse while shooter is on; intake advances during the pulse |
-| 2 | Right stick X | Manual turret rotation; release to stop |
-| 2 | D-pad up/down | Change shooter target by 50 encoder ticks/s |
-| 2 | Y / A | Increase/decrease hood servo position by 0.01 |
+| 2 | Right stick X | Manual turret rotation while auto aim is off; release to stop |
+| 2 | D-pad up/down | Change shooter target by 50 encoder ticks/s; with auto aim, adjusts a correction to the shot table |
+| 2 | D-pad left/right | Auto-aim turret correction +1° / −1° |
+| 2 | Y / A | Increase/decrease hood servo position by 0.01; with auto aim, adjusts a correction to the shot table |
+| 2 | X | Switch target CELL; press after each HIVE TIP |
 | 2 | Start | Zero turret encoder at its current position; does not home it |
 | 1 or 2 | Hold B | Stop intake, shooter, and turret; return feeder to rest |
 
@@ -82,7 +88,7 @@ mechanical limits or calibrated shooting settings.
    encoder ticks/s. Lower these for the first direction checks as needed.
 
 2. **Calibrate the two servos before attaching their horns/linkages.** Use
-   **Servo Position Test** as described below. In Basic TeleOp, INIT sends
+   **Servo Position Test** as described below. In RedTeleOp/BlueTeleOp, INIT sends
    no hood or feeder position commands. START commands hood `0.5` and feeder
    rest `0.5`. Provisional feeder feed is `0.6`, pulse duration is `250 ms`, and
    hood bounds are `0.25–0.75`. Establish the actual rest/feed positions and
@@ -112,6 +118,56 @@ mechanical limits or calibrated shooting settings.
    sizes the robot is intended to handle. Check collection/ejection, feeder
    cancellation, B, and Driver Station STOP. On exit, all eight DC motors are
    commanded to zero; servo shutdown is left to the SDK without a homing move.
+
+## Auto aim
+
+Ported from last season's `AutoAimSubsystem_MK2` / `AA_TeleOp_Base`.
+`AutoAim` drives the turret toward the upward CELL of our HIVE using odometry,
+with feedforward + PID, voltage compensation, and braking prediction. While
+aiming, flywheel speed and hood come from the shot table in `RobotConstants`.
+Gamepad 2 corrections are added to the shot table. Turret correction is stored
+in either mode, but only aiming uses it. With auto aim off, the turret, speed,
+and hood are manual as before. `AUTO_AIM_ENABLED` is `false`, so gamepad 1 X
+does nothing until it is set in `RobotConstants` or Panels.
+
+Field coordinates: +X away from the audience, +Y toward the red side, HIVE
+pivot at (72, 72). Red HIVE CELLs are at Y 84.75, blue at Y 59.25. Upward
+CELL aim points are at X 64 (audience side) or 80 (far side). These are
+estimates from manual Figures 9-9/9-10, set in `RedTeleOp` / `BlueTeleOp`.
+Red starts with the audience CELL up, and blue starts with the far CELL up.
+Press gamepad 2 X after every TIP; telemetry shows the current target CELL.
+
+TeleOp starts from the pose saved by autonomous (`autoEndPose`), which is (0, 0, 0)
+if no auto ran. Pressing gamepad 1 Start sets the alliance LOADING ZONE pose.
+That assumes the robot is centered in it with its back against the wall. Use
+`RESET_*` in each TeleOp, which assume an 18 in robot. The robot's heading at
+that moment becomes field-centric forward.
+
+Commissioning, in order:
+
+1. **Turret direction.** Positive ticks must be counterclockwise seen from
+   above, which turns the turret left. Gamepad 2 stick right should therefore
+   decrease ticks. If it doesn't, flip `TURRET_DIRECTION`.
+2. **Turret ratio.** Zero at center, jog to a large measured angle, and set
+   `TURRET_FULL_RANGE_DEGREE` / `TURRET_FULL_RANGE_ENCODER` to that angle and
+   tick count. The current values are placeholders. Check that telemetry
+   `Turret (deg)` matches.
+3. **Turret limits.** Set `TURRET_MIN_TICKS` / `TURRET_MAX_TICKS` as in
+   commissioning step 3. Auto aim only targets angles inside them. A target that
+   is out of range even going the long way returns the turret to 0. With both
+   limits at 0, auto aim just holds the turret at 0.
+4. **Turret offset.** Set `TURRET_OFFSET_X` / `TURRET_OFFSET_Y` to the turret
+   axis position relative to the robot center, from CAD.
+5. **Controller.** Enable auto aim and tune `AutoAim.TurretController` in
+   Panels: `kS`, `kV`, `kA`, then `kP`/`kD`, then `kLinearBraking`. The values
+   are last season's and were tuned for a different turret.
+6. **Shot table.** `Distance (in)` is shown even with auto aim off. Shoot
+   manually from several distances and record working speed and hood values in
+   `SHOT_DISTANCES` / `SHOT_VELOCITIES` / `SHOT_HOODS`. Values are interpolated
+   linearly and held at the ends. Adjust CELL aim points if shots consistently
+   land off-center.
+7. **Shooting while moving.** `SOTM_TIME_PER_INCH` / `SOTM_BASE_TIME` are last
+   season's lead-time values. Retune them after the shot table.
 
 ## Servo position test
 

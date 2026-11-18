@@ -6,6 +6,7 @@ import static org.firstinspires.ftc.teamcode.constants.RobotConstants.STICK_DEAD
 import com.pedropathing.drivetrain.DrivePowers;
 import com.pedropathing.follower.ManualDrive;
 import com.pedropathing.math.Pose;
+import com.pedropathing.math.Velocity;
 import com.pedropathing.revhub.drivetrains.Mecanum;
 import com.pedropathing.revhub.localizers.PinpointLocalizer;
 import com.qualcomm.robotcore.hardware.DcMotor;
@@ -33,12 +34,12 @@ public class Drivetrain {
         localizer.update();
     }
 
-    public void drive(Gamepad gamepad, double power, boolean fieldCentric) {
+    public void drive(Gamepad gamepad, double power, boolean fieldCentric, double forwardHeading) {
         double forward = deadband(-gamepad.left_stick_y);
         double strafe = deadband(-gamepad.left_stick_x);
         double turn = deadband(-gamepad.right_stick_x);
         DrivePowers powers = fieldCentric
-                ? ManualDrive.fieldCentric(forward, strafe, turn, getPose().heading())
+                ? ManualDrive.fieldCentric(forward, strafe, turn, getPose().heading() - forwardHeading)
                 : new DrivePowers(forward, strafe, turn);
         double scale = power / Math.max(1.0,
                 Math.abs(powers.forward()) + Math.abs(powers.strafe()) + Math.abs(powers.turn()));
@@ -48,6 +49,10 @@ public class Drivetrain {
 
     public Pose getPose() {
         return localizer.state().pose();
+    }
+
+    public Velocity getVelocity() {
+        return localizer.state().velocity();
     }
 
     public void setPose(Pose pose) {

@@ -15,7 +15,6 @@ public class RobotConfigs {
     public static final String HOOD = "hood";
     public static final String FEEDER = "feeder";
 
-    // Verify these directions on the assembled robot before loading balls.
     public static final DcMotorSimple.Direction INTAKE_DIRECTION = DcMotorSimple.Direction.REVERSE;
     public static final DcMotorSimple.Direction LEFT_SHOOTER_DIRECTION = DcMotorSimple.Direction.REVERSE;
     public static final DcMotorSimple.Direction RIGHT_SHOOTER_DIRECTION = DcMotorSimple.Direction.FORWARD;
